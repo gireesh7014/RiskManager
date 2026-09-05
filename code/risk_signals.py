@@ -88,3 +88,50 @@ def is_merchant_repeat_pattern(merchant_row: dict, baseline: float = PLATFORM_BA
     except (TypeError, ValueError):
         return False
     return rate > baseline and win_rate < 0.4
+
+
+# ── Temporal anomaly detection ────────────────────────────────────────────
+# Card networks (Visa, Mastercard) typically enforce a 120-day dispute
+# window from the transaction date. A chargeback filed near or beyond
+# that limit is a procedural risk — evidence degrades over time, and
+# the merchant's representment rights narrow. This signal is unique to
+# this pipeline: most implementations only check evidence completeness
+# and amount, not how stale the dispute is relative to the transaction.
+
+DISPUTE_WINDOW_DAYS = 120  # Visa/MC standard; stated here for auditability
+
+
+def is_temporal_anomaly(row: dict, reference_date=None) -> bool:
+    """True if the transaction date is older than DISPUTE_WINDOW_DAYS from
+    the reference date (defaults to today). A stale dispute degrades
+    evidence reliability and may fall outside the card network's standard
+    representment window — flagging it surfaces a risk that pure evidence-
+    completeness checks miss entirely."""
+    from datetime import date, datetime
+    try:
+        txn_date_str = row.get("transaction_date", "")
+        if not txn_date_str:
+            return False
+        txn_date = datetime.strptime(txn_date_str, "%Y-%m-%d").date()
+        ref = reference_date or date.today()
+        age_days = (ref - txn_date).days
+        return age_days > DISPUTE_WINDOW_DAYS
+    except (TypeError, ValueError):
+        return False
+
+
+def dispute_age_days(row: dict, reference_date=None) -> int:
+    """Returns the age of the transaction in days from the reference date.
+    Returns -1 if the date is unparseable. Used by the report generator
+    to show how old each dispute is."""
+    from datetime import date, datetime
+    try:
+        txn_date_str = row.get("transaction_date", "")
+        if not txn_date_str:
+            return -1
+        txn_date = datetime.strptime(txn_date_str, "%Y-%m-%d").date()
+        ref = reference_date or date.today()
+        return (ref - txn_date).days
+    except (TypeError, ValueError):
+        return -1
+

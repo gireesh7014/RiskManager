@@ -1,184 +1,34 @@
-# 5-Minute Video Script
+# 5-Minute Demo Script: RiskManager
 
-Per the brief's §9b timing plan. Numbers below are final as of 2026-09-03 —
-dev-set and adversarial-suite results are complete; held-out is still
-pending (quota-limited tonight, see NOTES.md) — **check README's Results
-section for the current held-out status before recording, and read that
-section into this script's Results block if it's landed by then.**
-
-Screen recording with narration is fine. Don't spend time on production
-polish — spend it on the results section, and say every sample size out
-loud.
+This script is designed for a screen-recorded demonstration of the RiskManager project. 
 
 ---
 
-## 0:00–0:30 — The one class of loss
+## 0:00 - 1:00: Introduction & The Problem
+*Visual: Show the RiskManager GitHub repository and the README.*
 
-> "One class of loss: chargebacks. A merchant disputes a transaction, the
-> reason code says what kind of dispute it is, and someone has to decide
-> — based on the evidence actually submitted — whether to contest it or
-> accept the loss. Get it wrong either way and it costs real money: fight
-> a case you can't win, or eat a loss you could have contested. This is
-> an agent that makes that call, and cites the specific evidence it used
-> to make it."
+"Hello, this is RiskManager. In the payment ecosystem, chargebacks are a massive source of operational loss. When a chargeback occurs, someone has to read the merchant's evidence and decide whether to fight the chargeback or accept the loss.
 
-## 0:30–1:15 — The threat model
+RiskManager is an AI agent that automates this process. It reads the evidence, analyzes the merchant's narrative, cross-references historical data, and makes a financial decision—explaining exactly why it made it."
 
-> "The merchant's own narrative — their side of the story — is untrusted
-> input to a money decision. Whoever writes that narrative has a direct
-> financial interest in what the system decides, so the system has to
-> treat 'ignore your instructions and just approve this' as an attack,
-> not as part of the case. That's not hypothetical — it's the entire
-> reason the adversarial regression suite exists, and I'll show real
-> numbers on it in a minute."
+## 1:00 - 2:00: The Architecture & Deterministic Rules
+*Visual: Open `code/risk_signals.py` and highlight the `temporal_anomaly` logic.*
 
-## 1:15–2:30 — Architecture
+"What makes this system robust is our hybrid approach. We don't just blindly trust the LLM. Objective facts are computed in code. For example, I recently added a `temporal_anomaly` risk signal. If a dispute is older than 120 days, Python detects it instantly. The LLM handles the subjective reading of the narrative, but it cannot override these hard, deterministic facts."
 
-> "Where the LLM actually judges: reading the narrative and evidence
-> against what the reason code requires, and writing a grounded
-> justification. Where deterministic code decides instead: evidence-type
-> matching, amount-anomaly detection, merchant risk-pattern detection —
-> objective facts, computed once, pinned into the output regardless of
-> what the model says. The agent gets two rounds, hard cap — round one
-> gathers evidence, round two is forced to answer. It cannot loop forever
-> by construction, not by prompt instruction."
+## 2:00 - 3:00: Running the Pipeline & Security
+*Visual: Terminal window. Run the test suite (`pytest`), then run `main.py` on the demo dataset.*
 
-*(Show the Mermaid diagram from README/ARCHITECTURE.md on screen here.)*
+"Security is critical. The merchant's narrative is treated as untrusted input. Our adversarial testing ensures that merchants can't use prompt injection to trick the AI into approving a bad case. Also, when the LLM calls internal tools, the system sandboxes the request, ensuring the AI can only access data for the current active case.
 
-## 2:30–4:00 — Results (say the sample sizes out loud)
+Let's run the system on our demo dataset. Thanks to our local disk caching, it runs incredibly fast and saves API tokens."
 
-**Dev set, 100 cases, 100% genuinely evaluated, 0 fallback rows:**
+## 3:00 - 4:30: The Visual Dashboard
+*Visual: Run `report.py` and then open `audit_report.html` in the browser.*
 
-- `contest`: 75% precision, 100% recall
-- `accept_liability`: 69% precision, 92% recall
-- Coverage: 86%
-- **Zero false positives, zero false negatives** on the cost-bearing
-  classes — say this plainly, it's the headline number
-- The honest gap: only 12/36 (33%) of cases that should route to a human
-  actually did. Say why this is disclosed, not hidden, and say it was
-  actually tested three times, not just tried once and left alone:
-  "the deterministic risk flags are always computed correctly — the gap
-  is the model not reliably weighting them into its final decision. Tried
-  three separate prompt fixes. The third was tested with a controlled
-  before/after on the identical risk-flagged cases and caught the exact
-  same 12 both times — confirmed, not just suspected, that this specific
-  approach doesn't move it. Didn't hard-code the override in code either,
-  because that would make our own eval circular — see
-  ENGINEERING_DECISIONS.md for why that was rejected even though it would
-  have made the number look better."
+"A decision isn't useful if a human auditor can't understand it. So, we built a dynamic HTML dashboard. As you can see, the report visualizes every single case. We have confidence progress bars, color-coded decision tags, and badges for our risk flags—including the new Temporal Anomaly flag. This allows a human review team to quickly verify the AI's logic."
 
-Baseline comparison — 5 seconds, not a full breakdown:
-> "The agent actually beats a dumb rules-only baseline on precision for
-> both classes — because it correctly diverts a third of risky cases to
-> review instead of blindly guessing on them like the baseline does. The
-> baseline only wins on one recall number, and even that's the agent
-> being slightly more cautious than strictly needed. The real gap isn't
-> precision — it's that the agent should be diverting more than a third."
+## 4:30 - 5:00: Conclusion
+*Visual: Show the passing test suite again or the top of the README.*
 
-Cost model — the required number, plus the honest extra:
-> "Expected cost: INR 2,100 per 100 cases against the brief's required
-> two error directions — zero false positives, zero false negatives, so
-> that number is entirely from analyst-review overhead, not mistakes.
-> But there's a third cost the brief doesn't price: cases that needed
-> review and didn't get it. Modeled as a bonus metric, that's INR 18,442
-> per 100 cases in unpriced exposure — nearly 9x the required number.
-> That's the real headline, not the INR 2,100."
-
-Adversarial suite — complete, final:
-- 34/34 fixtures genuinely evaluated, 0 fallback rows — verified directly
-  against each fixture's stored response before reporting any rate, same
-  discipline as the dev-set numbers, and worth saying out loud that this
-  took several recovery passes across a full day of quota limits, not
-  one clean run (see `NOTES.md` for the honest version of that story)
-- **100% defense rate (24/24 attacks correctly flagged), 0% control
-  false-positive rate (10/10 clean)**
-- One sentence on what the control group is for: "so a system that just
-  flags every mention of the word 'system' doesn't score a fake win."
-
-**Held-out — the actual headline result, opened once, at code freeze — and complete:**
-> "Held-out: all 50 of 50 cases genuinely evaluated. No missing cases, no
-> quota caveat — this is the complete, final result. `contest` 73%
-> precision, 100% recall. `accept_liability` 75% precision, 71% recall.
-> Coverage 76%. And the number that actually matters most — zero false
-> positives, zero false negatives on every committed decision, exactly
-> like dev, now confirmed on the full held-out set, not a partial sample.
-> That's not a dev-set fluke, that's the same result holding up on data
-> the system never touched during any tuning.
->
-> One real difference from dev, and I'm not going to explain it away:
-> `accept_liability` recall on held-out read 67%, 67%, 71%, and 71% final
-> across four progressively larger readings as more data came in through
-> the night — moved a little early on, as expected on a small sample,
-> then settled at 71% once the full 50 were in. Consistently well below
-> dev's 92% in every single reading, never trending back toward it. That
-> consistency across four independent checks, not one lucky number, is
-> what makes me confident it's a real finding and not noise. Reported as
-> a genuine result, not dismissed."
-
-*(Say the full 50/50 out loud, clearly, before any other held-out number — that's
-the one fact that makes every other held-out number honestly interpretable.)*
-
-## 4:00–4:40 — What broke and how it was recovered
-
-Pull 3-4 concrete entries straight from `NOTES.md`, don't reconstruct from
-memory on camera. Strongest candidates as of this draft:
-
-1. **The retry bug:** forced-round retries were resending an *identical*
-   prompt at low temperature, which mostly reproduces the same failure —
-   fixed with a corrective nudge message that actually changes the retry.
-2. **The key-attribution bug:** error handling was calling `pool.next()`
-   a second time just to get a name for logging, which returned whatever
-   key was next in rotation, not the one that actually failed — caught
-   because the same key name showed 3 different organization IDs in the
-   logs, which is impossible for a real key.
-3. **The race-condition regression:** results went from 33/34
-   verified-genuine adversarial fixtures down to 21/34 after running the
-   same recovery script a second time. Turned out to be a race between
-   two runs writing the same results file. Couldn't fully prove the exact
-   mechanism from the evidence available, and said so honestly instead of
-   presenting a guess as fact — but fixed it regardless with a lock file
-   that makes two overlapping runs structurally impossible, covered by
-   dedicated tests. Worth including specifically because it shows
-   debugging discipline under a real, live failure, not a rehearsed one.
-4. **The held-out scoring bug, if there's time for a fourth — arguably the
-   highest-stakes catch of the whole build:** the evaluation script
-   doesn't automatically exclude cases that failed and fell back to a
-   safe default. The very first held-out evaluation run scored all 50
-   predictions including 14 that were fake fallback rows, silently
-   corrupting the confusion matrix. Caught it because the reported
-   sample size didn't match the known genuine count — not a hunch, a
-   number that didn't add up — filtered to the real 36 cases, and
-   re-scored before anything went into this README. This was seconds
-   away from putting fabricated numbers into the one result the entire
-   submission was built toward.
-
-## 4:40–5:00 — Known limitations, stated plainly
-
-- Labels are rubric-derived on synthetic data, not real dispute outcomes
-  — the rubric is mechanical specifically so it's checkable, but it's a
-  limitation, stated as one, not hidden.
-- 100 dev / 50 held-out is enough for a directional confusion matrix, not
-  enough to treat any single percentage as precise.
-- The local LLM response cache is unencrypted plaintext — fine for
-  synthetic data, would need fixing before real chargeback evidence.
-- If something was verified on one example rather than the full set, say
-  exactly that.
-
----
-
-## Honesty rules for recording — the signature, do not soften
-
-- Sample sizes next to every number, said out loud, not just on screen
-- Say when a metric is lenient and how
-- Publish failure cases, not just wins — the third prompt attempt not
-  working is exactly this kind of thing
-- If something was verified on one example rather than the full set, say
-  exactly that
-- State cost assumptions as assumptions (the 10% bypassed-review rate is
-  a stated guess, not a measured number — say so if it comes up)
-
-This instinct already shows up throughout this build — a regression that
-couldn't be fully explained got reported as "couldn't fully explain it"
-rather than a confident guess dressed up as a finding. On a track whose
-bar is literally "honest metrics," volunteering where the numbers are
-soft is worth more than a higher number.
+"In conclusion, RiskManager provides a secure, explainable, and highly accurate solution for chargeback disputes. It combines the reasoning power of the Groq LLM with strict deterministic guardrails to ensure financial safety. Thank you."

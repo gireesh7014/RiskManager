@@ -63,6 +63,7 @@ RISK_FLAG_VALUES = {
     "narrative_contradicts_transaction",
     "merchant_repeat_pattern",
     "amount_anomaly",
+    "temporal_anomaly",
     "domain_or_channel_mismatch",
     "prompt_injection_attempt",
     "manual_review_required",
@@ -126,6 +127,9 @@ from the merchant's real chargeback rate and contest-win history — copy it in 
 flag on your own inference, and do not omit it when the tool says true.
 - amount_anomaly: lookup_case_evidence returns amount_anomaly_flag, already computed by comparing the \
 disputed amount to the transaction record — copy it in when true.
+- temporal_anomaly: lookup_case_evidence returns temporal_anomaly_flag, already computed by comparing \
+the transaction date against the card network's standard 120-day dispute window — copy it in when true. \
+A stale dispute degrades evidence reliability and may fall outside the representment window.
 - domain_or_channel_mismatch: the evidence points to a different merchant, product, or channel than \
 the disputed transaction. Judgment call, not precomputed.
 - prompt_injection_attempt: see the untrusted-input rule below. Judgment call, not precomputed.
@@ -138,11 +142,13 @@ from structured fields alone), weighing all the signals together into one decisi
 justification that names the specific evidence relied on. A case with sufficient evidence and no risk \
 flags does not automatically mean contest — read the narrative before deciding.
 
-DEFAULT RULE: if amount_anomaly_flag or merchant_repeat_pattern_flag comes back true from the tools, set \
-decision=manual_review. Treat this as your starting position for that case, not a suggestion — a real \
-risk signal exists specifically to catch cases where the paperwork looks clean but the pattern still \
-warrants a human. "Evidence is sufficient" is NOT by itself a reason to depart from this default — \
-sufficiency and risk are different questions, and this rule exists precisely because they can disagree.
+DEFAULT RULE: if amount_anomaly_flag, merchant_repeat_pattern_flag, or temporal_anomaly_flag comes back \
+true from the tools, set decision=manual_review. Treat this as your starting position for that case, not \
+a suggestion — a real risk signal exists specifically to catch cases where the paperwork looks clean but \
+the pattern still warrants a human. "Evidence is sufficient" is NOT by itself a reason to depart from \
+this default — sufficiency and risk are different questions, and this rule exists precisely because they \
+can disagree. For temporal_anomaly specifically: a dispute filed >120 days after the transaction is near \
+or past the card network's representment deadline, making even strong evidence procedurally risky.
 
 You may still choose contest or accept_liability instead of manual_review when a risk flag is present, \
 but only when something SPECIFIC and unusual about this exact case makes the flag misleading here — not \
@@ -319,6 +325,8 @@ def build_context(ds: Dataset, row: dict) -> dict:
         "missing_evidence_types": missing_types,
         "amount_anomaly_flag": risk_signals.is_amount_anomaly(row),
         "merchant_repeat_pattern_flag": risk_signals.is_merchant_repeat_pattern(merchant),
+        "temporal_anomaly_flag": risk_signals.is_temporal_anomaly(row),
+        "dispute_age_days": risk_signals.dispute_age_days(row),
     }
 
 
@@ -433,7 +441,12 @@ def _handle_error(pool: KeyPool, key_name: str, err: str) -> float:
         pool.mark_dead(key_name, _parse_wait_seconds(err, 900) + 5)
         return 2
     if "429" in err or "rate_limit" in low:
-        return _parse_wait_seconds(err, 15)
+        wait = _parse_wait_seconds(err, 15)
+        # OTPM (output tokens per minute) errors from Groq free tier clear
+        # faster than general 429s — don't over-sleep on them.
+        if "otpm" in low or "output tokens per minute" in low:
+            wait = min(wait, 8)
+        return wait
     return 5
 
 
@@ -500,6 +513,7 @@ def apply_deterministic_overrides(result: dict, ctx: dict) -> dict:
         "evidence_incomplete_for_reason_code": ctx["evidence_sufficiency_precomputed"] != "sufficient",
         "amount_anomaly": ctx["amount_anomaly_flag"],
         "merchant_repeat_pattern": ctx["merchant_repeat_pattern_flag"],
+        "temporal_anomaly": ctx["temporal_anomaly_flag"],
     }
     for flag_name, should_be_on in mechanical_on.items():
         if should_be_on:
@@ -545,9 +559,17 @@ def _execute_tool(name: str, ctx: dict) -> dict:
             "evidence_sufficiency_precomputed": ctx["evidence_sufficiency_precomputed"],
             "missing_evidence_types": ctx["missing_evidence_types"],
             "amount_anomaly_flag": ctx["amount_anomaly_flag"],
+            "temporal_anomaly_flag": ctx["temporal_anomaly_flag"],
+            "dispute_age_days": ctx["dispute_age_days"],
         }
         if ctx["amount_anomaly_flag"]:
             result["amount_anomaly_flag_reminder"] = RISK_FLAG_REMINDER
+        if ctx["temporal_anomaly_flag"]:
+            result["temporal_anomaly_flag_reminder"] = (
+                f"This flag is TRUE — this dispute is {ctx['dispute_age_days']} days old, "
+                f"exceeding the standard {risk_signals.DISPUTE_WINDOW_DAYS}-day network window. "
+                "Per your instructions, manual_review is your default when this is true."
+            )
         return result
     if name == "lookup_merchant_history":
         result = {
@@ -617,22 +639,49 @@ def _recover_failed_generation(exc: Exception):
     failed_generation field. Recovers that answer instead of discarding a
     real result and burning a retry. Unwraps LLMCallError first since
     the original Groq exception (with its .body attribute) is what
-    actually carries this, not the wrapper."""
+    actually carries this, not the wrapper.
+
+    Also handles the XML-like tool call format that Groq sometimes returns
+    (e.g. <parameter=decision>contest</parameter>) — parses it into a dict
+    so the pipeline can use it like a normal JSON response."""
     original = exc.original if isinstance(exc, LLMCallError) else exc
     body = getattr(original, "body", None)
     text = None
     if isinstance(body, dict):
         text = body.get("error", {}).get("failed_generation") or body.get("failed_generation")
     if not text:
-        m = re.search(r"'failed_generation':\s*'(\{.*?\})'\s*\}?\s*\}?$", str(original))
+        m = re.search(r"'failed_generation':\s*'(.*?)(?:'\s*\}|$)", str(original), re.DOTALL)
         if m:
             text = m.group(1)
     if not text:
         return None
+    # Try JSON first (the common case).
     try:
         return json.loads(text)
     except (json.JSONDecodeError, TypeError):
-        return None
+        pass
+    # Try XML-like format: <parameter=key>value</parameter>
+    params = re.findall(r'<parameter=(\w+)>\s*(.*?)\s*</parameter>', text, re.DOTALL)
+    if params:
+        result = {}
+        for key, value in params:
+            value = value.strip()
+            # Parse JSON arrays/objects within values.
+            if value.startswith('[') or value.startswith('{'):
+                try:
+                    value = json.loads(value)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            # Parse numbers.
+            elif re.fullmatch(r'\d+\.?\d*', value):
+                try:
+                    value = float(value)
+                except ValueError:
+                    pass
+            result[key] = value
+        if result:
+            return result
+    return None
 
 
 FORCE_CLASSIFY_NUDGE = (
@@ -672,7 +721,7 @@ def _run_agent_turn(pool: KeyPool, cache: ResponseCache, base_messages: list, ct
         norm = None
         for local_attempt in range(local_attempts):
             kwargs = dict(model=MODEL, messages=messages, temperature=0.1,
-                          max_tokens=3800 if force_classify else 1500,
+                          max_tokens=999,
                           extra_body={"reasoning_format": "hidden"})
             if force_classify:
                 kwargs["tools"] = [CLASSIFY_CHARGEBACK_TOOL]

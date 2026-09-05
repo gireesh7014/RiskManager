@@ -1,12 +1,43 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Python Caches & Bytecode
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual Environments
 .venv/
 venv/
-.env
+ENV/
+env/
+*/.venv/
+
+# Tool Caches & Logs
 .cache/
-.pytest_cache/
-dataset/dev/output*.csv
+*.log
+*.tmp
+
+# Editor & OS Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Generated Run Outputs & Audit Reports
+output*.csv
+dataset/**/output*.csv
+audit_report.html
+dataset/**/audit_report.html
 dataset/dev/cases_smoke.csv
 tests/adversarial_regression/results.csv
 tests/adversarial_regression/.run_suite.lock
-*.log
+

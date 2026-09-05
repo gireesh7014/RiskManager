@@ -118,6 +118,8 @@ def test_execute_tool_ignores_model_supplied_args_and_uses_ctx():
         "amount_anomaly_flag": False,
         "merchant_history_summary": "chargeback_rate_30d=1.2%",
         "merchant_repeat_pattern_flag": False,
+        "temporal_anomaly_flag": False,
+        "dispute_age_days": 30,
     }
     # A model could pass a completely different / hallucinated case_id here —
     # _execute_tool must not care, since it never reads its own arguments.
@@ -145,14 +147,18 @@ def test_execute_tool_adds_inline_reminder_only_when_flag_is_true():
         "merchant_history_summary": "chargeback_rate_30d=1.2%",
     }
     # Flag false - no reminder field at all, not even an empty one.
-    no_flag_ctx = {**base_ctx, "amount_anomaly_flag": False, "merchant_repeat_pattern_flag": False}
+    no_flag_ctx = {**base_ctx, "amount_anomaly_flag": False, "merchant_repeat_pattern_flag": False,
+                   "temporal_anomaly_flag": False, "dispute_age_days": 30}
     assert "amount_anomaly_flag_reminder" not in _execute_tool("lookup_case_evidence", no_flag_ctx)
+    assert "temporal_anomaly_flag_reminder" not in _execute_tool("lookup_case_evidence", no_flag_ctx)
     assert "merchant_repeat_pattern_flag_reminder" not in _execute_tool("lookup_merchant_history", no_flag_ctx)
 
     # Flag true - reminder present, and it says the flag is true.
-    flagged_ctx = {**base_ctx, "amount_anomaly_flag": True, "merchant_repeat_pattern_flag": True}
+    flagged_ctx = {**base_ctx, "amount_anomaly_flag": True, "merchant_repeat_pattern_flag": True,
+                   "temporal_anomaly_flag": True, "dispute_age_days": 180}
     r1 = _execute_tool("lookup_case_evidence", flagged_ctx)
     assert "TRUE" in r1["amount_anomaly_flag_reminder"]
+    assert "180 days" in r1["temporal_anomaly_flag_reminder"]
     r2 = _execute_tool("lookup_merchant_history", flagged_ctx)
     assert "TRUE" in r2["merchant_repeat_pattern_flag_reminder"]
 
@@ -162,6 +168,7 @@ def test_apply_deterministic_overrides_pins_evidence_sufficiency():
         "evidence_sufficiency_precomputed": "insufficient",
         "amount_anomaly_flag": False,
         "merchant_repeat_pattern_flag": False,
+        "temporal_anomaly_flag": False,
     }
     # Model guessed wrong (said sufficient) — override must correct it.
     result = {"decision": "contest", "evidence_sufficiency": "sufficient", "risk_flags": ["none"]}
@@ -175,6 +182,7 @@ def test_apply_deterministic_overrides_adds_amount_anomaly_and_repeat_pattern():
         "evidence_sufficiency_precomputed": "sufficient",
         "amount_anomaly_flag": True,
         "merchant_repeat_pattern_flag": True,
+        "temporal_anomaly_flag": False,
     }
     result = {"decision": "contest", "evidence_sufficiency": "sufficient", "risk_flags": ["none"]}
     out = apply_deterministic_overrides(result, ctx)
@@ -183,11 +191,25 @@ def test_apply_deterministic_overrides_adds_amount_anomaly_and_repeat_pattern():
     assert "none" not in out["risk_flags"]
 
 
+def test_apply_deterministic_overrides_adds_temporal_anomaly():
+    ctx = {
+        "evidence_sufficiency_precomputed": "sufficient",
+        "amount_anomaly_flag": False,
+        "merchant_repeat_pattern_flag": False,
+        "temporal_anomaly_flag": True,
+    }
+    result = {"decision": "contest", "evidence_sufficiency": "sufficient", "risk_flags": ["none"]}
+    out = apply_deterministic_overrides(result, ctx)
+    assert "temporal_anomaly" in out["risk_flags"]
+    assert "none" not in out["risk_flags"]
+
+
 def test_apply_deterministic_overrides_removes_incorrectly_claimed_flags():
     ctx = {
         "evidence_sufficiency_precomputed": "sufficient",
         "amount_anomaly_flag": False,
         "merchant_repeat_pattern_flag": False,
+        "temporal_anomaly_flag": False,
     }
     # Model incorrectly claimed amount_anomaly when the computed flag says False.
     result = {"decision": "contest", "evidence_sufficiency": "sufficient", "risk_flags": ["amount_anomaly"]}
@@ -219,6 +241,19 @@ def test_risk_signals_merchant_repeat_pattern_needs_both_conditions():
     assert risk_signals.is_merchant_repeat_pattern({"chargeback_rate_90d": "2.0", "prior_contest_win_rate": "0.1"}) is True
     # Low rate, poor win record — not flagged, rate alone doesn't trigger it.
     assert risk_signals.is_merchant_repeat_pattern({"chargeback_rate_90d": "0.1", "prior_contest_win_rate": "0.1"}) is False
+
+
+def test_risk_signals_temporal_anomaly():
+    from datetime import date
+    ref = date(2026, 9, 5)  # fixed reference so test is deterministic
+    # Recent transaction — not flagged.
+    assert risk_signals.is_temporal_anomaly({"transaction_date": "2026-07-15"}, reference_date=ref) is False
+    # Old transaction (>120 days) — flagged.
+    assert risk_signals.is_temporal_anomaly({"transaction_date": "2026-01-10"}, reference_date=ref) is True
+    # Exactly at the boundary (120 days) — not flagged (must exceed, not equal).
+    assert risk_signals.is_temporal_anomaly({"transaction_date": "2026-05-08"}, reference_date=ref) is False
+    # Missing date — not flagged.
+    assert risk_signals.is_temporal_anomaly({}) is False
 
 
 def test_is_fallback_row_detects_the_safe_placeholder():
