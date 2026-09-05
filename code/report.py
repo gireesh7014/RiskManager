@@ -351,7 +351,7 @@ def generate_report(cases: list, predictions: list, output_path: Path) -> Path:
 
     html_content += f"""
   <footer>
-    Warrant · AI Risk Manager · Track 02 · Chargeback Evidence Responder<br>
+    RiskManager &middot; AI Risk Manager &middot; Track 02 &middot; Chargeback Evidence Responder<br>
     Every decision explainable, bounded, and gated. This is the audit trail.
   </footer>
 </div>

@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RiskManager — AI Chargeback Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e1a;
+      --bg-secondary: #111827;
+      --bg-card: #1a2035;
+      --bg-card-hover: #1f2847;
+      --border: #2a3450;
+      --border-hover: #3d4f7a;
+      --text-primary: #f0f4ff;
+      --text-secondary: #8b99b8;
+      --text-muted: #5a6a8a;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-purple: #8b5cf6;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-rose: #f43f5e;
+      --glass-bg: rgba(26, 32, 53, 0.7);
+      --glass-border: rgba(255, 255, 255, 0.06);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Animated Background ── */
+    .bg-gradient {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      pointer-events: none;
+      background: 
+        radial-gradient(ellipse 600px 400px at 20% 10%, rgba(59, 130, 246, 0.08) 0%, transparent 70%),
+        radial-gradient(ellipse 500px 500px at 80% 50%, rgba(139, 92, 246, 0.06) 0%, transparent 70%),
+        radial-gradient(ellipse 400px 300px at 50% 90%, rgba(6, 182, 212, 0.05) 0%, transparent 70%);
+      animation: bgShift 20s ease-in-out infinite alternate;
+    }
+
+    @keyframes bgShift {
+      0%   { opacity: 1; }
+      50%  { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+
+    .app { position: relative; z-index: 1; }
+
+    /* ── Header ── */
+    .header {
+      padding: 2rem 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(20px);
+      background: rgba(10, 14, 26, 0.8);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 1rem; }
+    
+    .logo-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem;
+      font-weight: 800;
+      box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+    }
+
+    .header-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #f0f4ff 30%, #8b99b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .header-right { display: flex; align-items: center; gap: 1rem; }
+
+    .dataset-select {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 0.5rem 1rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .dataset-select:hover { border-color: var(--accent-blue); }
+    .dataset-select:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+
+    .live-dot {
+      width: 8px; height: 8px;
+      background: var(--accent-emerald);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .status-text { font-size: 0.8rem; color: var(--accent-emerald); font-weight: 500; }
+
+    /* ── Main Layout ── */
+    .main-content { padding: 2rem 3rem 4rem; max-width: 1440px; margin: 0 auto; }
+
+    /* ── Stats Grid ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .stat-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--border-hover);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: 16px 16px 0 0;
+    }
+    .stat-card.blue::before { background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan)); }
+    .stat-card.green::before { background: linear-gradient(90deg, var(--accent-emerald), #34d399); }
+    .stat-card.red::before { background: linear-gradient(90deg, var(--accent-red), var(--accent-rose)); }
+    .stat-card.amber::before { background: linear-gradient(90deg, var(--accent-amber), #fbbf24); }
+    .stat-card.purple::before { background: linear-gradient(90deg, var(--accent-purple), #a78bfa); }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-value {
+      font-size: 2.2rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 0.25rem;
+    }
+    .stat-card.blue .stat-value { color: var(--accent-blue); }
+    .stat-card.green .stat-value { color: var(--accent-emerald); }
+    .stat-card.red .stat-value { color: var(--accent-red); }
+    .stat-card.amber .stat-value { color: var(--accent-amber); }
+    .stat-card.purple .stat-value { color: var(--accent-purple); }
+
+    .stat-desc { font-size: 0.75rem; color: var(--text-secondary); }
+
+    /* ── Risk Flags Summary Bar ── */
+    .flags-bar {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+      padding: 1.25rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+
+    .flag-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #fff;
+      transition: transform 0.15s;
+    }
+    .flag-chip:hover { transform: scale(1.05); }
+    .flag-chip .count {
+      background: rgba(255,255,255,0.2);
+      padding: 0.1rem 0.45rem;
+      border-radius: 5px;
+      font-size: 0.7rem;
+    }
+
+    /* ── Filter Tabs ── */
+    .filter-section {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .filter-tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: var(--bg-secondary);
+      padding: 0.35rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+
+    .filter-tab {
+      padding: 0.5rem 1.2rem;
+      border-radius: 9px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      background: none;
+      font-family: 'Inter', sans-serif;
+    }
+    .filter-tab:hover { color: var(--text-primary); background: rgba(255,255,255,0.04); }
+    .filter-tab.active {
+      color: #fff;
+      background: var(--accent-blue);
+      box-shadow: 0 2px 10px rgba(59, 130, 246, 0.3);
+    }
+
+    .cases-count { font-size: 0.85rem; color: var(--text-muted); }
+
+    /* ── Case Cards ── */
+    .cases-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+    .case-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+    .case-card:hover {
+      border-color: var(--border-hover);
+      box-shadow: 0 6px 30px rgba(0,0,0,0.25);
+    }
+    .case-card.expanded { border-color: var(--accent-blue); }
+
+    .case-summary {
+      display: grid;
+      grid-template-columns: 130px 1fr 140px 140px 100px 44px;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      gap: 1rem;
+    }
+
+    .case-id-cell {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+    }
+
+    .case-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .case-info-main { font-size: 0.88rem; font-weight: 500; }
+    .case-info-sub { font-size: 0.75rem; color: var(--text-muted); }
+
+    .decision-pill {
+      padding: 0.35rem 0.9rem;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      text-align: center;
+      color: #fff;
+    }
+    .decision-pill.contest { background: linear-gradient(135deg, #059669, #10b981); box-shadow: 0 2px 10px rgba(16,185,129,0.3); }
+    .decision-pill.accept_liability { background: linear-gradient(135deg, #dc2626, #ef4444); box-shadow: 0 2px 10px rgba(239,68,68,0.3); }
+    .decision-pill.manual_review { background: linear-gradient(135deg, #d97706, #f59e0b); box-shadow: 0 2px 10px rgba(245,158,11,0.3); }
+
+    .confidence-cell { display: flex; flex-direction: column; gap: 0.3rem; }
+    .confidence-bar-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.06);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .confidence-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .confidence-bar-fill.high { background: linear-gradient(90deg, var(--accent-emerald), #34d399); }
+    .confidence-bar-fill.mid { background: linear-gradient(90deg, var(--accent-amber), #fbbf24); }
+    .confidence-bar-fill.low { background: linear-gradient(90deg, var(--accent-red), var(--accent-rose)); }
+
+    .confidence-label { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; }
+
+    .expand-icon {
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.04);
+      color: var(--text-muted);
+      transition: all 0.2s;
+      font-size: 0.85rem;
+    }
+    .case-card:hover .expand-icon { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+    .case-card.expanded .expand-icon { transform: rotate(180deg); background: rgba(59,130,246,0.2); color: var(--accent-blue); }
+
+    /* ── Case Detail Panel ── */
+    .case-detail {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      background: rgba(0,0,0,0.15);
+    }
+    .case-card.expanded .case-detail { max-height: 1200px; }
+
+    .case-detail-inner {
+      padding: 0 1.5rem 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .detail-section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .detail-section-title {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .detail-section-title::before {
+      content: '';
+      width: 3px; height: 14px;
+      border-radius: 2px;
+      background: var(--accent-blue);
+    }
+
+    .reason-text {
+      font-size: 0.88rem;
+      line-height: 1.7;
+      color: var(--text-secondary);
+    }
+
+    .evidence-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.65rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .evidence-item:last-child { border-bottom: none; }
+
+    .ev-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      background: rgba(59,130,246,0.15);
+      color: var(--accent-blue);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+
+    .ev-content { flex: 1; }
+    .ev-type {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.15rem;
+    }
+    .ev-desc { font-size: 0.8rem; color: var(--text-secondary); }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+    .meta-item {
+      padding: 0.65rem;
+      background: rgba(255,255,255,0.02);
+      border-radius: 8px;
+    }
+    .meta-label { font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .meta-value { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-top: 0.15rem; }
+
+    .flag-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .detail-flag {
+      padding: 0.3rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .age-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-weight: 700;
+      font-size: 0.82rem;
+    }
+    .age-indicator.stale { color: var(--accent-red); }
+    .age-indicator.warning { color: var(--accent-amber); }
+    .age-indicator.ok { color: var(--accent-emerald); }
+
+    .narrative-box {
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      padding: 1rem;
+      font-size: 0.85rem;
+      line-height: 1.65;
+      color: var(--text-secondary);
+      font-style: italic;
+      border-left: 3px solid var(--accent-purple);
+    }
+
+    .full-width { grid-column: 1 / -1; }
+
+    /* ── Loading State ── */
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 6rem 0;
+      gap: 1.5rem;
+    }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--text-muted); font-size: 0.9rem; }
+
+    /* ── Animations ── */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in {
+      animation: fadeInUp 0.5s ease forwards;
+      opacity: 0;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 1200px) {
+      .stats-grid { grid-template-columns: repeat(3, 1fr); }
+      .case-summary { grid-template-columns: 110px 1fr 120px 100px 44px; }
+      .case-summary > :nth-child(4) { display: none; }
+    }
+    @media (max-width: 768px) {
+      .header { padding: 1.25rem 1.5rem; }
+      .main-content { padding: 1.5rem; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .case-summary { grid-template-columns: 1fr auto 44px; }
+      .case-summary > :nth-child(2),
+      .case-summary > :nth-child(4),
+      .case-summary > :nth-child(5) { display: none; }
+      .case-detail-inner { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="bg-gradient"></div>
+
+<div class="app">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo-icon">R</div>
+      <div>
+        <div class="header-title">RiskManager</div>
+        <div class="header-subtitle">AI Chargeback Intelligence</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <select class="dataset-select" id="datasetSelect" onchange="loadData()">
+        <option value="demo">Demo Dataset</option>
+        <option value="dev">Dev Dataset (100 cases)</option>
+      </select>
+      <div class="live-dot"></div>
+      <span class="status-text">System Active</span>
+    </div>
+  </header>
+
+  <main class="main-content" id="mainContent">
+    <div class="loading" id="loadingState">
+      <div class="spinner"></div>
+      <div class="loading-text">Loading analysis data...</div>
+    </div>
+  </main>
+</div>
+
+<script>
+const FLAG_COLORS = {
+  'amount_anomaly': '#f43f5e',
+  'merchant_repeat_pattern': '#8b5cf6',
+  'temporal_anomaly': '#06b6d4',
+  'evidence_incomplete_for_reason_code': '#f97316',
+  'narrative_contradicts_transaction': '#ec4899',
+  'prompt_injection_attempt': '#dc2626',
+  'domain_or_channel_mismatch': '#6366f1',
+  'manual_review_required': '#64748b',
+};
+
+let allCases = [];
+let currentFilter = 'all';
+
+async function loadData() {
+  const dataset = document.getElementById('datasetSelect').value;
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `<div class="loading"><div class="spinner"></div><div class="loading-text">Loading ${dataset} dataset...</div></div>`;
+
+  try {
+    const res = await fetch(`/api/cases?dataset=${dataset}`);
+    const data = await res.json();
+    allCases = data.cases;
+    renderDashboard(data);
+  } catch (err) {
+    main.innerHTML = `<div class="loading"><div class="loading-text" style="color:var(--accent-red)">Error loading data. Make sure the dataset exists.</div></div>`;
+  }
+}
+
+function renderDashboard(data) {
+  const { summary, cases } = data;
+  const main = document.getElementById('mainContent');
+
+  let html = '';
+
+  // Stats Grid
+  html += `
+    <div class="stats-grid">
+      <div class="stat-card blue animate-in" style="animation-delay:0.05s">
+        <div class="stat-label">Total Cases</div>
+        <div class="stat-value" data-count="${summary.total}">0</div>
+        <div class="stat-desc">Analyzed by RiskManager</div>
+      </div>
+      <div class="stat-card green animate-in" style="animation-delay:0.1s">
+        <div class="stat-label">Contest</div>
+        <div class="stat-value" data-count="${summary.decisions.contest || 0}">0</div>
+        <div class="stat-desc">Evidence supports dispute</div>
+      </div>
+      <div class="stat-card red animate-in" style="animation-delay:0.15s">
+        <div class="stat-label">Accept Liability</div>
+        <div class="stat-value" data-count="${summary.decisions.accept_liability || 0}">0</div>
+        <div class="stat-desc">Insufficient grounds</div>
+      </div>
+      <div class="stat-card amber animate-in" style="animation-delay:0.2s">
+        <div class="stat-label">Manual Review</div>
+        <div class="stat-value" data-count="${summary.decisions.manual_review || 0}">0</div>
+        <div class="stat-desc">Requires human judgment</div>
+      </div>
+      <div class="stat-card purple animate-in" style="animation-delay:0.25s">
+        <div class="stat-label">Avg Confidence</div>
+        <div class="stat-value" data-count="${Math.round(summary.avg_confidence * 100)}">0</div>
+        <div class="stat-desc">Model certainty score</div>
+      </div>
+    </div>`;
+
+  // Risk Flags Summary
+  const flagEntries = Object.entries(summary.flag_counts || {}).sort((a, b) => b[1] - a[1]);
+  if (flagEntries.length > 0) {
+    html += `<div class="flags-bar animate-in" style="animation-delay:0.3s">`;
+    html += `<span style="font-size:0.78rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:0.4rem 0.5rem;">Risk Signals</span>`;
+    for (const [name, count] of flagEntries) {
+      const color = FLAG_COLORS[name] || '#475569';
+      const label = name.replace(/_/g, ' ');
+      html += `<div class="flag-chip" style="background:${color};">${label} <span class="count">${count}</span></div>`;
+    }
+    html += `</div>`;
+  }
+
+  // Filter Tabs
+  html += `
+    <div class="filter-section animate-in" style="animation-delay:0.35s">
+      <div class="filter-tabs">
+        <button class="filter-tab active" data-filter="all" onclick="filterCases('all', this)">All</button>
+        <button class="filter-tab" data-filter="contest" onclick="filterCases('contest', this)">Contest</button>
+        <button class="filter-tab" data-filter="accept_liability" onclick="filterCases('accept_liability', this)">Accept</button>
+        <button class="filter-tab" data-filter="manual_review" onclick="filterCases('manual_review', this)">Review</button>
+      </div>
+      <span class="cases-count" id="casesCount">${cases.length} cases</span>
+    </div>`;
+
+  // Cases List
+  html += `<div class="cases-list" id="casesList">`;
+  html += renderCases(cases);
+  html += `</div>`;
+
+  main.innerHTML = html;
+
+  // Count-up animation for stat values
+  setTimeout(() => animateCounters(), 100);
+}
+
+function renderCases(cases) {
+  let html = '';
+  cases.forEach((c, idx) => {
+    const confPct = Math.round(c.confidence * 100);
+    const confClass = confPct >= 75 ? 'high' : confPct >= 45 ? 'mid' : 'low';
+    const decisionLabel = c.decision.replace(/_/g, ' ');
+
+    const ageClass = c.dispute_age_days > 120 ? 'stale' : c.dispute_age_days > 90 ? 'warning' : 'ok';
+    const ageIcon = c.dispute_age_days > 120 ? '⚠' : c.dispute_age_days > 90 ? '◐' : '●';
+
+    html += `
+    <div class="case-card animate-in" style="animation-delay:${0.4 + idx * 0.06}s" onclick="toggleCase(this)">
+      <div class="case-summary">
+        <div class="case-id-cell">${c.case_id}</div>
+        <div class="case-info">
+          <div class="case-info-main">₹${parseFloat(c.amount).toLocaleString('en-IN')} · ${c.payment_method.toUpperCase()} · Code ${c.reason_code}</div>
+          <div class="case-info-sub">${c.merchant_id} · ${c.transaction_date}</div>
+        </div>
+        <div><span class="decision-pill ${c.decision}">${decisionLabel}</span></div>
+        <div class="confidence-cell">
+          <div class="confidence-bar-track"><div class="confidence-bar-fill ${confClass}" style="width:${confPct}%"></div></div>
+          <span class="confidence-label">${confPct}% confidence</span>
+        </div>
+        <div class="age-indicator ${ageClass}">${ageIcon} ${c.dispute_age_days >= 0 ? c.dispute_age_days + 'd' : 'N/A'}</div>
+        <div class="expand-icon">▼</div>
+      </div>
+
+      <div class="case-detail">
+        <div class="case-detail-inner">
+          <!-- AI Reasoning -->
+          <div class="detail-section full-width">
+            <div class="detail-section-title">AI Reasoning</div>
+            <div class="reason-text">${escapeHtml(c.reason)}</div>
+          </div>
+
+          <!-- Transaction Details -->
+          <div class="detail-section">
+            <div class="detail-section-title">Transaction Details</div>
+            <div class="meta-grid">
+              <div class="meta-item">
+                <div class="meta-label">Amount</div>
+                <div class="meta-value">₹${parseFloat(c.amount).toLocaleString('en-IN')}</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Original</div>
+                <div class="meta-value">₹${parseFloat(c.original_amount).toLocaleString('en-IN')}</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Method</div>
+                <div class="meta-value">${c.payment_method.toUpperCase()}</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Reason Code</div>
+                <div class="meta-value">${c.reason_code}</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Sufficiency</div>
+                <div class="meta-value">${c.evidence_sufficiency.replace(/_/g, ' ')}</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Cited Evidence</div>
+                <div class="meta-value" style="font-family:'JetBrains Mono',monospace;color:var(--accent-cyan);font-size:0.82rem;">${c.cited_evidence_ids}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Risk Flags -->
+          <div class="detail-section">
+            <div class="detail-section-title">Risk Flags & Merchant Info</div>
+            <div class="flag-list" style="margin-bottom:1rem;">
+              ${c.risk_flags.length > 0 ? c.risk_flags.map(f => `<span class="detail-flag" style="background:${FLAG_COLORS[f] || '#475569'}">${f.replace(/_/g, ' ')}</span>`).join('') : '<span style="font-size:0.82rem;color:var(--accent-emerald);">✓ No risk signals detected</span>'}
+            </div>
+            <div class="meta-grid">
+              <div class="meta-item">
+                <div class="meta-label">Chargeback Rate (90d)</div>
+                <div class="meta-value">${c.chargeback_rate_90d !== 'N/A' ? (parseFloat(c.chargeback_rate_90d) * 100).toFixed(2) + '%' : 'N/A'}</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Contest Win Rate</div>
+                <div class="meta-value">${c.prior_contest_win_rate !== 'N/A' ? (parseFloat(c.prior_contest_win_rate) * 100).toFixed(1) + '%' : 'N/A'}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Merchant Narrative -->
+          ${c.merchant_narrative ? `
+          <div class="detail-section full-width">
+            <div class="detail-section-title">Merchant Narrative</div>
+            <div class="narrative-box">"${escapeHtml(c.merchant_narrative)}"</div>
+          </div>` : ''}
+
+          <!-- Evidence Items -->
+          ${c.evidence_items.length > 0 ? `
+          <div class="detail-section full-width">
+            <div class="detail-section-title">Submitted Evidence (${c.evidence_items.length} items)</div>
+            ${c.evidence_items.map(ev => `
+              <div class="evidence-item">
+                <span class="ev-id">${ev.id}</span>
+                <div class="ev-content">
+                  <div class="ev-type">${ev.type.replace(/_/g, ' ')}</div>
+                  <div class="ev-desc">${escapeHtml(ev.description)}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  });
+  return html;
+}
+
+function toggleCase(el) {
+  el.classList.toggle('expanded');
+}
+
+function filterCases(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+
+  const filtered = filter === 'all' ? allCases : allCases.filter(c => c.decision === filter);
+  document.getElementById('casesList').innerHTML = renderCases(filtered);
+  document.getElementById('casesCount').textContent = `${filtered.length} cases`;
+}
+
+function animateCounters() {
+  document.querySelectorAll('.stat-value[data-count]').forEach(el => {
+    const target = parseInt(el.dataset.count);
+    const duration = 1200;
+    const start = performance.now();
+
+    function update(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(target * ease);
+      // Check if the parent has 'purple' class (percentage)
+      el.textContent = el.closest('.stat-card').classList.contains('purple') ? current + '%' : current;
+      if (progress < 1) requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+  });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Load data on page load
+loadData();
+</script>
+</body>
+</html>
