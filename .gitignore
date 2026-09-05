@@ -7,11 +7,18 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Testing, Linting & Coverage
 .pytest_cache/
 .coverage
 htmlcov/
+coverage.xml
+*.cover
 .mypy_cache/
 .ruff_cache/
+.hypothesis/
+.tox/
+.nox/
 
 # Virtual Environments
 .venv/
@@ -24,20 +31,47 @@ env/
 .cache/
 *.log
 *.tmp
+.webassets-cache/
 
-# Editor & OS Files
+# Flask & Web Application
+instance/
+flask_session/
+*.sqlite
+*.sqlite3
+*.db
+
+# IDEs & Editor Files
 .vscode/
 .idea/
+.vs/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# OS Specific Files
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
 desktop.ini
+ehthumbs.db
+
+# Build & Packaging Artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
 
 # Generated Run Outputs & Audit Reports
 output*.csv
+*output*.csv
 dataset/**/output*.csv
-audit_report.html
-dataset/**/audit_report.html
+audit_report*.html
+dataset/**/audit_report*.html
 dataset/dev/cases_smoke.csv
 tests/adversarial_regression/results.csv
 tests/adversarial_regression/.run_suite.lock
+
 
