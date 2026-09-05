@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="assets/logo.png" alt="RiskManager logo" width="120">
 
   # RiskManager
 
